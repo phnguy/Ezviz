@@ -19,7 +19,7 @@ async def async_setup_entry(hass: core.HomeAssistant, entry: config_entries.Conf
 
     # Forward the setup to the switch platform.
     hass.async_create_task(
-        hass.config_entries.async_forward_entry_setup(entry, "switch")
+        hass.config_entries.async_forward_entry_setups(entry, "switch")
     )
 
     return True
