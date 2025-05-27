@@ -15,9 +15,16 @@ A Home Assistant custom integration for EZVIZ devices with switchable features. 
 - CS-T30-10A-EU
 - CS-T30-10B-EU
 - CS-CPD7-R105-1K3
+- And other EZVIZ smart plug models
 
-### Other Devices
-- Interphones and other devices with switchable features (like gates/doorbells)
+### Security Devices
+- Doorbell cameras with switchable features
+- Interphones and gate controls
+- Security cameras with switchable lights/alarms
+
+### Other EZVIZ Devices
+- Any EZVIZ device that has switchable features in the EZVIZ app
+- Devices with multiple switchable functions are supported
 
 ## Prerequisites
 

@@ -116,7 +116,15 @@ async def async_setup_entry(hass: core.HomeAssistant, entry: ConfigEntry,
 
 
 class Ezvizswitch(SwitchEntity, RestoreEntity):
-    """Representation of Ezviz Switchable Device Entity."""
+    """Representation of Ezviz Switchable Device Entity.
+    
+    This class handles all types of EZVIZ devices that have switchable features,
+    including smart plugs, doorbells, security cameras, and other devices with
+    switchable components like lights, alarms, etc.
+    
+    Each device can have multiple switchable entities, which are all represented
+    in the attributes of the primary entity.
+    """
 
     def __init__(self, switch, ezvizClient) -> None:
         """Initialize the Ezviz device."""
