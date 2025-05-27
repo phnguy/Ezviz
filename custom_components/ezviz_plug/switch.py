@@ -71,12 +71,12 @@ async def async_setup_platform(hass, config, add_entities, discovery_info=None):
     coordinator = EzvizDataUpdateCoordinator(hass, api=ezvizClient, api_timeout=10)
 
     # Add devices
-    plugs = []
-    switches = await coordinator._async_update_data();
-    for key, switch in switches.items():
-        plugs.append(Ezvizswitch(switch, ezvizClient))
+    entities = []
+    devices = await coordinator._async_update_data();
+    for key, device in devices.items():
+        entities.append(Ezvizswitch(device, ezvizClient))
 
-    add_entities(plugs)
+    add_entities(entities)
 
     # Do not close the client session as it's needed by the entities
     # _LOGGER.info('Closing the Client session.')
@@ -103,12 +103,12 @@ async def async_setup_entry(hass: core.HomeAssistant, entry: ConfigEntry,
     coordinator = EzvizDataUpdateCoordinator(hass, api=ezvizClient, api_timeout=10)
 
     # Add devices
-    plugs = []
-    switches = await coordinator._async_update_data();
-    for key, switch in switches.items():
-        plugs.append(Ezvizswitch(switch, ezvizClient))
+    entities = []
+    devices = await coordinator._async_update_data();
+    for key, device in devices.items():
+        entities.append(Ezvizswitch(device, ezvizClient))
 
-    async_add_entities(plugs)
+    async_add_entities(entities)
 
     # Do not close the client session as it's needed by the entities
     # _LOGGER.debug('Closing the Client session.')
@@ -185,11 +185,24 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
             # Process the data similar to coordinator._update_data
             for device in switches['deviceInfos']:
                 if device['deviceSerial'] == self._switch['deviceSerial']:
-                    for entity in switches['SWITCH'][device['deviceSerial']]:
-                        # Store the actual device type
-                        device['enable'] = entity['enable']
-                        device['switch_type'] = int(entity['type'])
-                        break  # Use the first available switch type
+                    # Process all entities for the device
+                    entities = []
+                    device_serial = device['deviceSerial']
+                    
+                    if device_serial in switches['SWITCH']:
+                        for entity in switches['SWITCH'][device_serial]:
+                            entity_data = {
+                                'enable': entity['enable'],
+                                'switch_type': int(entity['type'])
+                            }
+                            entities.append(entity_data)
+                        
+                        # Store entity information
+                        if entities:
+                            # For backward compatibility, use the first entity's data
+                            device['enable'] = entities[0]['enable']
+                            device['switch_type'] = entities[0]['switch_type']
+                            device['entities'] = entities
                     
                     self._switch = device
                     break
@@ -236,6 +249,11 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
         # Include the switch type in the attributes if available
         if 'switch_type' in self._switch:
             attributes["switch_type"] = self._switch.get('switch_type')
+        
+        # Include information about all entities if available
+        if 'entities' in self._switch:
+            attributes["entities_count"] = len(self._switch['entities'])
+            attributes["all_entities"] = self._switch['entities']
             
         return attributes
 
