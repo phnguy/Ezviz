@@ -78,8 +78,9 @@ async def async_setup_platform(hass, config, add_entities, discovery_info=None):
 
     add_entities(plugs)
 
-    _LOGGER.info('Closing the Client session.')
-    ezvizClient.close_session()
+    # Do not close the client session as it's needed by the entities
+    # _LOGGER.info('Closing the Client session.')
+    # ezvizClient.close_session()
 
 
 async def async_setup_entry(hass: core.HomeAssistant, entry: ConfigEntry,
@@ -109,8 +110,9 @@ async def async_setup_entry(hass: core.HomeAssistant, entry: ConfigEntry,
 
     async_add_entities(plugs)
 
-    _LOGGER.debug('Closing the Client session.')
-    ezvizClient.close_session()
+    # Do not close the client session as it's needed by the entities
+    # _LOGGER.debug('Closing the Client session.')
+    # ezvizClient.close_session()
 
 
 class Ezvizswitch(SwitchEntity, RestoreEntity):
@@ -166,17 +168,30 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
             self._last_run_success = False
 
     async def async_update(self):
+        """Update the entity."""
         _LOGGER.debug("calling update method.")
 
-        coordinator = EzvizDataUpdateCoordinator(self.hass, api=self._ezviz_client, api_timeout=10)
-        switches = await coordinator._async_update_data()
-        self._switch = switches[self._switch["deviceSerial"]]
+        try:
+            # Directly fetch the data without creating a new coordinator
+            switches = self._ezviz_client._api_get_pagelist(page_filter="SWITCH")
+            
+            # Process the data similar to coordinator._update_data
+            for device in switches['deviceInfos']:
+                if device['deviceSerial'] == self._switch['deviceSerial']:
+                    for entity in switches['SWITCH'][device['deviceSerial']]:
+                        if int(entity['type']) == 14:
+                            device['enable'] = entity['enable']
+                    
+                    self._switch = device
+                    break
+        except Exception as ex:
+            _LOGGER.error("Error updating entity: %s", ex)
 
     @property
     def is_on(self) -> bool:
         """Return true if device is on."""
 
-        if self._state is not bool:
+        if not isinstance(self._state, bool):
             self._state = (True if self._switch['enable'] == 1 else False)
 
         return self._state
