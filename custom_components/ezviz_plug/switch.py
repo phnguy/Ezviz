@@ -73,8 +73,19 @@ async def async_setup_platform(hass, config, add_entities, discovery_info=None):
     # Add devices
     entities = []
     devices = await coordinator._async_update_data();
+    
     for key, device in devices.items():
-        entities.append(Ezvizswitch(device, ezvizClient))
+        # Check if device has multiple entities
+        if 'entities' in device and len(device['entities']) > 1:
+            # Create an entity for each switchable feature
+            for i, entity_data in enumerate(device['entities']):
+                entities.append(Ezvizswitch(device, ezvizClient, entity_data=entity_data, entity_index=i))
+                _LOGGER.debug("Created entity for device %s: %s (type: %s)", 
+                            device['deviceSerial'], entity_data.get('switch_type', 'unknown'))
+        else:
+            # Create a single entity for backward compatibility
+            entities.append(Ezvizswitch(device, ezvizClient))
+            _LOGGER.debug("Created single entity for device %s", device['deviceSerial'])
 
     add_entities(entities)
 
@@ -105,8 +116,19 @@ async def async_setup_entry(hass: core.HomeAssistant, entry: ConfigEntry,
     # Add devices
     entities = []
     devices = await coordinator._async_update_data();
+    
     for key, device in devices.items():
-        entities.append(Ezvizswitch(device, ezvizClient))
+        # Check if device has multiple entities
+        if 'entities' in device and len(device['entities']) > 1:
+            # Create an entity for each switchable feature
+            for i, entity_data in enumerate(device['entities']):
+                entities.append(Ezvizswitch(device, ezvizClient, entity_data=entity_data, entity_index=i))
+                _LOGGER.debug("Created entity for device %s: %s (type: %s)", 
+                            device['deviceSerial'], entity_data.get('switch_type', 'unknown'))
+        else:
+            # Create a single entity for backward compatibility
+            entities.append(Ezvizswitch(device, ezvizClient))
+            _LOGGER.debug("Created single entity for device %s", device['deviceSerial'])
 
     async_add_entities(entities)
 
@@ -122,18 +144,35 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
     including smart plugs, doorbells, security cameras, and other devices with
     switchable components like lights, alarms, etc.
     
-    Each device can have multiple switchable entities, which are all represented
-    in the attributes of the primary entity.
+    Each device can have multiple switchable entities, with each entity representing
+    a specific switchable feature (e.g., light, alarm, doorbell, etc.).
     """
 
-    def __init__(self, switch, ezvizClient) -> None:
-        """Initialize the Ezviz device."""
-
+    def __init__(self, switch, ezvizClient, entity_data=None, entity_index=None) -> None:
+        """Initialize the Ezviz device.
+        
+        Args:
+            switch: The device data containing information about the device
+            ezvizClient: The Ezviz client for API communication
+            entity_data: Specific entity data if this is a sub-entity of a device
+            entity_index: Index of this entity in the device's entities list
+        """
         self._state = None
         self._last_run_success = None
         self._last_pressed: datetime | None = None
         self._switch = switch
         self._ezviz_client = ezvizClient
+        self._entity_data = entity_data
+        self._entity_index = entity_index
+        
+        # For entities with specific entity_data, use its switch_type
+        if entity_data:
+            self._switch_type = entity_data['switch_type']
+            self._enable = entity_data['enable']
+        else:
+            # For backward compatibility - use the device's primary switch type
+            self._switch_type = switch.get('switch_type', DeviceSwitchType.PLUG.value)
+            self._enable = switch.get('enable', False)
 
     async def async_added_to_hass(self):
         """Run when entity about to be added."""
@@ -150,16 +189,16 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
     def turn_on(self, **kwargs) -> None:
         """Turn device on."""
 
-        _LOGGER.debug('Turning on %s (current state is: %s cloud: %s)', self._switch['name'], self._state,
-                     self._switch['enable'])
+        _LOGGER.debug('Turning on %s (current state is: %s)', self.name, self._state)
 
-        # Use the actual device switch_type instead of hardcoding to DeviceSwitchType.PLUG
-        switch_type = self._switch.get('switch_type', DeviceSwitchType.PLUG.value)  # Default to PLUG if not found for backward compatibility
-        _LOGGER.debug('Using switch type: %s for device: %s', switch_type, self._switch['name'])
-        
-        if self._ezviz_client.switch_status(self._switch["deviceSerial"], switch_type, 1):
+        # Use the entity-specific switch type
+        if self._ezviz_client.switch_status(self._switch["deviceSerial"], self._switch_type, 1):
             self._state = True
-            self._switch['enable'] = True
+            self._enable = True
+            if self._entity_data:
+                self._entity_data['enable'] = True
+            else:
+                self._switch['enable'] = True
             self._last_pressed = dt_util.utcnow()
             self._last_run_success = True
         else:
@@ -167,16 +206,16 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
 
     def turn_off(self, **kwargs) -> None:
         """Turn device off."""
-        _LOGGER.debug('Turning off %s (current state is: %s cloud: %s)', self._switch['name'], self._state,
-                     self._switch['enable'])
+        _LOGGER.debug('Turning off %s (current state is: %s)', self.name, self._state)
 
-        # Use the actual device switch_type instead of hardcoding to DeviceSwitchType.PLUG
-        switch_type = self._switch.get('switch_type', DeviceSwitchType.PLUG.value)  # Default to PLUG if not found for backward compatibility
-        _LOGGER.debug('Using switch type: %s for device: %s', switch_type, self._switch['name'])
-        
-        if self._ezviz_client.switch_status(self._switch["deviceSerial"], switch_type, 0):
+        # Use the entity-specific switch type
+        if self._ezviz_client.switch_status(self._switch["deviceSerial"], self._switch_type, 0):
             self._state = False
-            self._switch['enable'] = False
+            self._enable = False
+            if self._entity_data:
+                self._entity_data['enable'] = False
+            else:
+                self._switch['enable'] = False
             self._last_pressed = dt_util.utcnow()
             self._last_run_success = True
         else:
@@ -188,7 +227,7 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
     
     async def async_update(self):
         """Update the entity."""
-        _LOGGER.debug("calling update method.")
+        _LOGGER.debug("calling update method for %s", self.name)
 
         try:
             # Use async_add_executor_job to avoid blocking the event loop
@@ -216,17 +255,27 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
                             device['switch_type'] = entities[0]['switch_type']
                             device['entities'] = entities
                     
+                    # Update our device data
                     self._switch = device
+                    
+                    # If this is an entity-specific instance, update the entity data
+                    if self._entity_data and self._entity_index is not None and 'entities' in device:
+                        if 0 <= self._entity_index < len(device['entities']):
+                            # Update the entity data with the latest from the API
+                            self._entity_data = device['entities'][self._entity_index]
+                            self._switch_type = self._entity_data['switch_type']
+                            self._enable = self._entity_data['enable']
+                    
                     break
         except Exception as ex:
-            _LOGGER.error("Error updating entity: %s", ex)
+            _LOGGER.error("Error updating entity %s: %s", self.name, ex)
 
     @property
     def is_on(self) -> bool:
         """Return true if device is on."""
 
         if not isinstance(self._state, bool):
-            self._state = (True if self._switch['enable'] == 1 else False)
+            self._state = (True if self._enable == 1 or self._enable is True else False)
 
         return self._state
 
@@ -238,12 +287,37 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
     @property
     def unique_id(self) -> str:
         """Return a unique, Home Assistant friendly identifier for this entity."""
-        return self._switch['deviceSerial']
+        if self._entity_data:
+            # For entity-specific switches, include the switch type in the ID
+            return f"{self._switch['deviceSerial']}_{self._switch_type}"
+        else:
+            # For backward compatibility
+            return self._switch['deviceSerial']
 
     @property
     def name(self) -> str:
         """Return the name of the switch."""
-        return self._switch['name']
+        # If this is a specific entity from a device with multiple entities, append the entity type
+        if self._entity_data and 'entities' in self._switch and len(self._switch['entities']) > 1:
+            # Get a friendly name for the switch type
+            switch_type_name = self._get_switch_type_name(self._switch_type)
+            return f"{self._switch['name']} {switch_type_name}"
+        else:
+            return self._switch['name']
+            
+    def _get_switch_type_name(self, switch_type):
+        """Get a friendly name for the switch type."""
+        # Map switch types to user-friendly names
+        switch_type_names = {
+            DeviceSwitchType.ALARM_TONE.value: "Alarm",
+            DeviceSwitchType.LIGHT.value: "Light", 
+            DeviceSwitchType.PLUG.value: "Plug",
+            DeviceSwitchType.DOORBELL_TALK.value: "Doorbell",
+            DeviceSwitchType.OUTDOOR_RINGING_SOUND.value: "Ringing Sound",
+            DeviceSwitchType.ALARM_LIGHT.value: "Alarm Light",
+            DeviceSwitchType.INFRARED_LIGHT.value: "IR Light"
+        }
+        return switch_type_names.get(switch_type, f"Switch {switch_type}")
 
     def last_pressed(self) -> str:
         if self._last_pressed is None:
@@ -258,12 +332,11 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
             "last_pressed": self.last_pressed()
         }
         
-        # Include the switch type in the attributes if available
-        if 'switch_type' in self._switch:
-            attributes["switch_type"] = self._switch.get('switch_type')
+        # Always include the switch type in the attributes
+        attributes["switch_type"] = self._switch_type
         
-        # Include information about all entities if available
-        if 'entities' in self._switch:
+        # For the main device entity, include information about all entities
+        if not self._entity_data and 'entities' in self._switch:
             attributes["entities_count"] = len(self._switch['entities'])
             attributes["all_entities"] = self._switch['entities']
             
@@ -288,8 +361,8 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
     @property
     def icon(self) -> str:
         """Icon of the entity."""
-        # Determine icon based on the switch type or device type
-        switch_type = self._switch.get('switch_type', DeviceSwitchType.PLUG.value)
+        # Determine icon based on the entity's switch type
+        switch_type = self._switch_type
         
         # Use proper mapping based on DeviceSwitchType values
         if switch_type == DeviceSwitchType.DOORBELL_TALK.value:  # DOORBELL_TALK (101)
