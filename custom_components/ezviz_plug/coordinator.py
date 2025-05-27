@@ -28,19 +28,38 @@ class EzvizDataUpdateCoordinator(DataUpdateCoordinator):
     def _update_data(self) -> dict:
         """Fetch Ezviz switchable devices data."""
 
-        plugs = {}
+        devices = {}
         switches = self.ezviz_client._api_get_pagelist(page_filter="SWITCH")
+        _LOGGER.debug("Found %d total devices from API", len(switches.get('deviceInfos', [])))
+        
         for device in switches['deviceInfos']:
-            for entity in switches['SWITCH'][device['deviceSerial']]:
-                # Store the actual device type instead of checking only for type 14 (PLUG)
-                device['enable'] = entity['enable']
-                device['switch_type'] = int(entity['type'])
-                break  # Use the first available switch type
+            # Process all entities for each device, not just the first one
+            entities = []
+            device_serial = device['deviceSerial']
+            
+            if device_serial in switches['SWITCH']:
+                for entity in switches['SWITCH'][device_serial]:
+                    entity_data = {
+                        'enable': entity['enable'],
+                        'switch_type': int(entity['type'])
+                    }
+                    entities.append(entity_data)
+                
+                # If we have entities, store the device with its entities
+                if entities:
+                    # For backward compatibility, store the first entity's data at device level
+                    device['enable'] = entities[0]['enable']
+                    device['switch_type'] = entities[0]['switch_type']
+                    device['entities'] = entities
+                    
+                    # Include all devices with switchable entities, not just Q* or BC*
+                    devices[device_serial] = device
+                    _LOGGER.debug("Added device %s with %d entities (types: %s)", 
+                                device_serial, len(entities), 
+                                [e['switch_type'] for e in entities])
 
-            if device["deviceSerial"].startswith("Q") or device["deviceSerial"].startswith("BC"):
-                plugs[device['deviceSerial']] = device
-
-        return plugs
+        _LOGGER.info("Discovered %d switchable devices (previously filtered to Q*/BC* only)", len(devices))
+        return devices
 
     async def _async_update_data(self) -> dict:
         """Fetch data from Ezviz."""
