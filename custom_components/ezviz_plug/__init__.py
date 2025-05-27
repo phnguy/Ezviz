@@ -1,4 +1,4 @@
-"""Ezviz Smart Plug integration."""
+"""Ezviz Device Control integration."""
 
 from homeassistant import config_entries, core
 from .const import DOMAIN
@@ -31,6 +31,6 @@ async def options_update_listener(hass: core.HomeAssistant, config_entry: config
 
 
 async def async_setup(hass: core.HomeAssistant, config: dict) -> bool:
-    """Set up the Ezviz Smart Plug custom component from yaml configuration."""
+    """Set up the Ezviz Device Control custom component from yaml configuration."""
     hass.data.setdefault(DOMAIN, {})
     return True

@@ -26,14 +26,16 @@ class EzvizDataUpdateCoordinator(DataUpdateCoordinator):
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval)
 
     def _update_data(self) -> dict:
-        """Fetch Ezviz smart plugs data."""
+        """Fetch Ezviz switchable devices data."""
 
         plugs = {}
         switches = self.ezviz_client._api_get_pagelist(page_filter="SWITCH")
         for device in switches['deviceInfos']:
             for entity in switches['SWITCH'][device['deviceSerial']]:
-                if int(entity['type']) == 14:  # Equal comparison for integers
-                    device['enable'] = entity['enable']
+                # Store the actual device type instead of checking only for type 14 (PLUG)
+                device['enable'] = entity['enable']
+                device['switch_type'] = int(entity['type'])
+                break  # Use the first available switch type
 
             if device["deviceSerial"].startswith("Q") or device["deviceSerial"].startswith("BC"):
                 plugs[device['deviceSerial']] = device
