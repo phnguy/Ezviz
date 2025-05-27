@@ -32,7 +32,7 @@ class EzvizDataUpdateCoordinator(DataUpdateCoordinator):
         switches = self.ezviz_client._api_get_pagelist(page_filter="SWITCH")
         for device in switches['deviceInfos']:
             for entity in switches['SWITCH'][device['deviceSerial']]:
-                if int(entity['type']) is int(14):
+                if int(entity['type']) == 14:  # Equal comparison for integers
                     device['enable'] = entity['enable']
 
             if device["deviceSerial"].startswith("Q") or device["deviceSerial"].startswith("BC"):
