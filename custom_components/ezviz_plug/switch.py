@@ -51,7 +51,12 @@ async def async_unload_entry(hass, config_entry):
 
 
 async def async_setup_platform(hass, config, add_entities, discovery_info=None):
-    """Perform the setup for Ezviz switchable devices."""
+    """Perform the setup for Ezviz switchable devices.
+    
+    Creates individual entities for each switchable feature of a device, allowing
+    separate control of different functions (lights, alarms, etc.) on the same
+    physical device.
+    """
 
     _LOGGER.debug('calling setup_platform')
 
@@ -96,7 +101,12 @@ async def async_setup_platform(hass, config, add_entities, discovery_info=None):
 
 async def async_setup_entry(hass: core.HomeAssistant, entry: ConfigEntry,
                             async_add_entities: AddEntitiesCallback) -> None:
-    """Set up Ezviz switch based on a config entry."""
+    """Set up Ezviz switch based on a config entry.
+    
+    Creates individual entities for each switchable feature of a device, allowing
+    separate control of different functions (lights, alarms, etc.) on the same
+    physical device.
+    """
 
     email = hass.data[DOMAIN][entry.entry_id][CONF_EMAIL]
     password = hass.data[DOMAIN][entry.entry_id][CONF_PASSWORD]
