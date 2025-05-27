@@ -174,13 +174,17 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
         else:
             self._last_run_success = False
 
+    def _fetch_switch_data(self):
+        """Fetch switch data synchronously."""
+        return self._ezviz_client._api_get_pagelist(page_filter="SWITCH")
+    
     async def async_update(self):
         """Update the entity."""
         _LOGGER.debug("calling update method.")
 
         try:
-            # Directly fetch the data without creating a new coordinator
-            switches = self._ezviz_client._api_get_pagelist(page_filter="SWITCH")
+            # Use async_add_executor_job to avoid blocking the event loop
+            switches = await self.hass.async_add_executor_job(self._fetch_switch_data)
             
             # Process the data similar to coordinator._update_data
             for device in switches['deviceInfos']:
