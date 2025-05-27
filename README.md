@@ -11,14 +11,17 @@ A Home Assistant custom integration for EZVIZ devices with switchable features. 
 
 ## Supported Devices
 
-- CS-T30-10A-EU (Smart Plug)
-- CS-T30-10B-EU (Smart Plug)
-- CS-CPD7-R105-1K3 (Smart Plug)
+### Smart Plugs
+- CS-T30-10A-EU
+- CS-T30-10B-EU
+- CS-CPD7-R105-1K3
+
+### Other Devices
 - Interphones and other devices with switchable features (like gates/doorbells)
 
 ## Prerequisites
 
-- An EZVIZ account with registered smart plugs
+- An EZVIZ account with registered devices
 - Home Assistant installation (version 2021.12.0 or higher recommended)
 - PyEzviz Python package (installed automatically)
 
@@ -31,7 +34,7 @@ A Home Assistant custom integration for EZVIZ devices with switchable features. 
 3. Add this repository URL: `https://github.com/phnguy/Ezviz`
 4. Select "Integration" as the category
 5. Click "Add"
-6. Search for "EZVIZ Smart Plug" in the Integrations tab
+6. Search for "EZVIZ Device Control" in the Integrations tab
 7. Click "Install"
 8. Restart Home Assistant
 
