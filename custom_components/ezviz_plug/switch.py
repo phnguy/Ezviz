@@ -116,7 +116,15 @@ async def async_setup_entry(hass: core.HomeAssistant, entry: ConfigEntry,
 
 
 class Ezvizswitch(SwitchEntity, RestoreEntity):
-    """Representation of Ezviz Switchable Device Entity."""
+    """Representation of Ezviz Switchable Device Entity.
+    
+    This class handles all types of EZVIZ devices that have switchable features,
+    including smart plugs, doorbells, security cameras, and other devices with
+    switchable components like lights, alarms, etc.
+    
+    Each device can have multiple switchable entities, which are all represented
+    in the attributes of the primary entity.
+    """
 
     def __init__(self, switch, ezvizClient) -> None:
         """Initialize the Ezviz device."""
@@ -145,8 +153,8 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
         _LOGGER.debug('Turning on %s (current state is: %s cloud: %s)', self._switch['name'], self._state,
                      self._switch['enable'])
 
-        # Use the actual device switch_type instead of hardcoding to 14 (PLUG)
-        switch_type = self._switch.get('switch_type', 14)  # Default to 14 if not found for backward compatibility
+        # Use the actual device switch_type instead of hardcoding to DeviceSwitchType.PLUG
+        switch_type = self._switch.get('switch_type', DeviceSwitchType.PLUG.value)  # Default to PLUG if not found for backward compatibility
         _LOGGER.debug('Using switch type: %s for device: %s', switch_type, self._switch['name'])
         
         if self._ezviz_client.switch_status(self._switch["deviceSerial"], switch_type, 1):
@@ -162,8 +170,8 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
         _LOGGER.debug('Turning off %s (current state is: %s cloud: %s)', self._switch['name'], self._state,
                      self._switch['enable'])
 
-        # Use the actual device switch_type instead of hardcoding to 14 (PLUG)
-        switch_type = self._switch.get('switch_type', 14)  # Default to 14 if not found for backward compatibility
+        # Use the actual device switch_type instead of hardcoding to DeviceSwitchType.PLUG
+        switch_type = self._switch.get('switch_type', DeviceSwitchType.PLUG.value)  # Default to PLUG if not found for backward compatibility
         _LOGGER.debug('Using switch type: %s for device: %s', switch_type, self._switch['name'])
         
         if self._ezviz_client.switch_status(self._switch["deviceSerial"], switch_type, 0):
@@ -281,18 +289,29 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
     def icon(self) -> str:
         """Icon of the entity."""
         # Determine icon based on the switch type or device type
-        switch_type = self._switch.get('switch_type', 14)
+        switch_type = self._switch.get('switch_type', DeviceSwitchType.PLUG.value)
         
-        # DOORBELL_TALK (101) - For interphones
-        if switch_type == 101:
+        # Use proper mapping based on DeviceSwitchType values
+        if switch_type == DeviceSwitchType.DOORBELL_TALK.value:  # DOORBELL_TALK (101)
             return "mdi:doorbell"
-        # Various switch types that could be related to gate/door controls
-        elif switch_type in [1, 3, 39]:  # ALARM_TONE, LIGHT, OUTDOOR_RINGING_SOUND
-            return "mdi:gate"
-        # Default to plug icons for actual smart plugs
-        elif self._switch["deviceType"].endswith("EU"):
-            return "mdi:power-socket-de"
-        elif self._switch["deviceSerial"].endswith("US"):
-            return "mdi:power-socket-us"
+        elif switch_type == DeviceSwitchType.ALARM_TONE.value:  # ALARM_TONE (1)
+            return "mdi:bell-ring"
+        elif switch_type == DeviceSwitchType.LIGHT.value:  # LIGHT (3)
+            return "mdi:lightbulb"
+        elif switch_type == DeviceSwitchType.OUTDOOR_RINGING_SOUND.value:  # OUTDOOR_RINGING_SOUND (39)
+            return "mdi:volume-high"
+        elif switch_type == DeviceSwitchType.ALARM_LIGHT.value:  # ALARM_LIGHT (303)
+            return "mdi:alarm-light"
+        elif switch_type == DeviceSwitchType.INFRARED_LIGHT.value:  # INFRARED_LIGHT (10)
+            return "mdi:flashlight"
+        elif switch_type == DeviceSwitchType.PLUG.value:  # PLUG (14)
+            # Use regional specific icons for plugs based on device type/serial
+            if self._switch["deviceType"].endswith("EU"):
+                return "mdi:power-socket-de"
+            elif self._switch["deviceSerial"].endswith("US"):
+                return "mdi:power-socket-us"
+            else:
+                return "mdi:power-socket"
+        # Default for any other switchable device
         else:
-            return "mdi:power-socket"
+            return "mdi:toggle-switch"

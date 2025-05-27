@@ -26,7 +26,13 @@ class EzvizDataUpdateCoordinator(DataUpdateCoordinator):
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval)
 
     def _update_data(self) -> dict:
-        """Fetch Ezviz switchable devices data."""
+        """Fetch Ezviz switchable devices data.
+        
+        This method retrieves all devices with switchable features from the EZVIZ API.
+        It processes all types of devices and their switchable entities, not limited to
+        specific model prefixes. Each device can have multiple switchable entities which
+        are all captured and stored.
+        """
 
         devices = {}
         switches = self.ezviz_client._api_get_pagelist(page_filter="SWITCH")
@@ -52,13 +58,13 @@ class EzvizDataUpdateCoordinator(DataUpdateCoordinator):
                     device['switch_type'] = entities[0]['switch_type']
                     device['entities'] = entities
                     
-                    # Include all devices with switchable entities, not just Q* or BC*
+                    # Include all devices with switchable entities - supports all EZVIZ device types
                     devices[device_serial] = device
                     _LOGGER.debug("Added device %s with %d entities (types: %s)", 
                                 device_serial, len(entities), 
                                 [e['switch_type'] for e in entities])
 
-        _LOGGER.info("Discovered %d switchable devices (previously filtered to Q*/BC* only)", len(devices))
+        _LOGGER.info("Discovered %d switchable devices (all EZVIZ device types with switchable features)", len(devices))
         return devices
 
     async def _async_update_data(self) -> dict:
