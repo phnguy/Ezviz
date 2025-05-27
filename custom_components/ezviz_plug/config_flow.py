@@ -56,7 +56,7 @@ def _validate_and_create_auth(data: dict) -> dict[str, Any]:
 
 
 class EzvizConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Ezviz Plugs."""
+    """Handle a config flow for EZVIZ Devices."""
 
     async def async_step_user(self, user_input):
 
