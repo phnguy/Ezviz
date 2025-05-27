@@ -262,6 +262,22 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
         return attributes
 
     @property
+    def device_info(self) -> Dict[str, Any]:
+        """Return device information to link entities to device registry."""
+        device_info = {
+            "identifiers": {(DOMAIN, self._switch["deviceSerial"])},
+            "name": self._switch["name"],
+            "manufacturer": "EZVIZ",
+            "model": self._switch.get("deviceType", "Unknown"),
+        }
+        
+        # Add software version if available
+        if "version" in self._switch:
+            device_info["sw_version"] = self._switch["version"]
+            
+        return device_info
+
+    @property
     def icon(self) -> str:
         """Icon of the entity."""
         # Determine icon based on the switch type or device type
