@@ -1,19 +1,20 @@
-# EZVIZ Smart Plug
+# EZVIZ Device Control
 
-A Home Assistant custom integration for EZVIZ Smart Plugs. This integration allows you to control your EZVIZ smart plugs from within Home Assistant.
+A Home Assistant custom integration for EZVIZ devices with switchable features. This integration allows you to control your EZVIZ devices like smart plugs, interphones, and gate controls from within Home Assistant.
 
 ## Features
 
-- Control EZVIZ smart plugs (turn on/off)
+- Control EZVIZ devices with switchable features (turn on/off)
 - Monitor availability status
-- Auto-discovery of all EZVIZ smart plugs in your account
+- Auto-discovery of all EZVIZ switchable devices in your account
 - Integration with Home Assistant UI
 
 ## Supported Devices
 
-- CS-T30-10A-EU
-- CS-T30-10B-EU
-- CS-CPD7-R105-1K3
+- CS-T30-10A-EU (Smart Plug)
+- CS-T30-10B-EU (Smart Plug)
+- CS-CPD7-R105-1K3 (Smart Plug)
+- Interphones and other devices with switchable features (like gates/doorbells)
 
 ## Prerequisites
 
@@ -46,7 +47,7 @@ A Home Assistant custom integration for EZVIZ Smart Plugs. This integration allo
 ### Using the UI (Recommended)
 
 1. Go to Settings → Devices & Services → Add Integration
-2. Search for "EZVIZ Smart Plug"
+2. Search for "EZVIZ Device Control"
 3. Click on it and follow the configuration flow
 4. Enter your EZVIZ account email and password
 5. Select your region (EU, Russia, or Custom)
