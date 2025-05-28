@@ -35,6 +35,15 @@ class DeviceSwitchType:
     OUTDOOR_RINGING_SOUND = 39
     DOORBELL_TALK = 101
     ALARM_LIGHT = 303
+    
+class DeviceCategory:
+    """Device categories based on device type."""
+    CAMERA = "camera"
+    DOORBELL = "doorbell"
+    PLUG = "plug"
+    GATEWAY = "gateway"
+    SECURITY = "security_device"
+    UNKNOWN = "unknown"
 
 SCAN_INTERVAL = timedelta(seconds=5)
 _LOGGER = logging.getLogger(__name__)
@@ -83,18 +92,25 @@ async def async_setup_platform(hass, config, add_entities, discovery_info=None):
     entities = []
     devices = await coordinator._async_update_data();
     
+    _LOGGER.info("Setting up %d EZVIZ devices with switchable features", len(devices))
+    
     for key, device in devices.items():
+        device_type = device.get("deviceType", "Unknown")
+        _LOGGER.info("Found device %s (type: %s) with serial %s", 
+                    device.get('name', 'Unknown'), device_type, device.get('deviceSerial', 'Unknown'))
+        
         # Check if device has multiple entities
         if 'entities' in device and len(device['entities']) > 1:
             # Create an entity for each switchable feature
             for i, entity_data in enumerate(device['entities']):
                 entities.append(Ezvizswitch(device, ezvizClient, entity_data=entity_data, entity_index=i))
                 _LOGGER.debug("Created entity for device %s: %s (type: %s)", 
-                            device['deviceSerial'], entity_data.get('switch_type', 'unknown'))
+                            device['deviceSerial'], entity_data.get('switch_type', 'unknown'), device_type)
         else:
             # Create a single entity for backward compatibility
             entities.append(Ezvizswitch(device, ezvizClient))
-            _LOGGER.debug("Created single entity for device %s", device['deviceSerial'])
+            _LOGGER.debug("Created single entity for device %s (type: %s)", 
+                        device['deviceSerial'], device_type)
 
     add_entities(entities)
 
@@ -132,18 +148,25 @@ async def async_setup_entry(hass: core.HomeAssistant, entry: ConfigEntry,
     entities = []
     devices = await coordinator._async_update_data();
     
+    _LOGGER.info("Setting up %d EZVIZ devices with switchable features", len(devices))
+    
     for key, device in devices.items():
+        device_type = device.get("deviceType", "Unknown")
+        _LOGGER.info("Found device %s (type: %s) with serial %s", 
+                    device.get('name', 'Unknown'), device_type, device.get('deviceSerial', 'Unknown'))
+        
         # Check if device has multiple entities
         if 'entities' in device and len(device['entities']) > 1:
             # Create an entity for each switchable feature
             for i, entity_data in enumerate(device['entities']):
                 entities.append(Ezvizswitch(device, ezvizClient, entity_data=entity_data, entity_index=i))
                 _LOGGER.debug("Created entity for device %s: %s (type: %s)", 
-                            device['deviceSerial'], entity_data.get('switch_type', 'unknown'))
+                            device['deviceSerial'], entity_data.get('switch_type', 'unknown'), device_type)
         else:
             # Create a single entity for backward compatibility
             entities.append(Ezvizswitch(device, ezvizClient))
-            _LOGGER.debug("Created single entity for device %s", device['deviceSerial'])
+            _LOGGER.debug("Created single entity for device %s (type: %s)", 
+                        device['deviceSerial'], device_type)
 
     async_add_entities(entities)
 
@@ -350,6 +373,10 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
         # Always include the switch type in the attributes
         attributes["switch_type"] = self._switch_type
         
+        # Include device category information
+        attributes["device_category"] = self._get_device_category()
+        attributes["device_type"] = self._switch.get("deviceType", "Unknown")
+        
         # For the main device entity, include information about all entities
         if not self._entity_data and 'entities' in self._switch:
             attributes["entities_count"] = len(self._switch['entities'])
@@ -360,11 +387,24 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
     @property
     def device_info(self) -> Dict[str, Any]:
         """Return device information to link entities to device registry."""
+        # Get device category
+        device_category = self._get_device_category()
+        
+        # Log device type detection for debugging
+        _LOGGER.debug(
+            "Device %s identified as %s type (raw deviceType: %s)", 
+            self._switch["deviceSerial"], 
+            device_category, 
+            self._switch.get("deviceType", "Unknown")
+        )
+        
+        # Build device info
         device_info = {
             "identifiers": {(DOMAIN, self._switch["deviceSerial"])},
             "name": self._switch["name"],
             "manufacturer": "EZVIZ",
             "model": self._switch.get("deviceType", "Unknown"),
+            "suggested_area": device_category.capitalize(),
         }
         
         # Add software version if available
@@ -376,16 +416,21 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
     @property
     def icon(self) -> str:
         """Icon of the entity."""
-        # Determine icon based on the entity's switch type
+        # Get device category to inform icon selection
+        device_category = self._get_device_category()
         switch_type = self._switch_type
         
-        # Use proper mapping based on DeviceSwitchType values
+        # First, prioritize by switch type
         if switch_type == DeviceSwitchType.DOORBELL_TALK.value:  # DOORBELL_TALK (101)
             return "mdi:doorbell"
         elif switch_type == DeviceSwitchType.ALARM_TONE.value:  # ALARM_TONE (1)
             return "mdi:bell-ring"
         elif switch_type == DeviceSwitchType.LIGHT.value:  # LIGHT (3)
-            return "mdi:lightbulb"
+            # Different light icon based on device category
+            if device_category == DeviceCategory.CAMERA:
+                return "mdi:video-wireless"
+            else:
+                return "mdi:lightbulb"
         elif switch_type == DeviceSwitchType.OUTDOOR_RINGING_SOUND.value:  # OUTDOOR_RINGING_SOUND (39)
             return "mdi:volume-high"
         elif switch_type == DeviceSwitchType.ALARM_LIGHT.value:  # ALARM_LIGHT (303)
@@ -400,9 +445,21 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
                 return "mdi:power-socket-us"
             else:
                 return "mdi:power-socket"
+        
+        # If no specific switch type match, use category-based icons
+        if device_category == DeviceCategory.CAMERA:
+            return "mdi:cctv"
+        elif device_category == DeviceCategory.DOORBELL:
+            return "mdi:doorbell-video"
+        elif device_category == DeviceCategory.PLUG:
+            return "mdi:power-socket"
+        elif device_category == DeviceCategory.GATEWAY:
+            return "mdi:router-wireless"
+        elif device_category == DeviceCategory.SECURITY:
+            return "mdi:shield-home"
+            
         # Default for any other switchable device
-        else:
-            return "mdi:toggle-switch"
+        return "mdi:toggle-switch"
 
     @property
     def is_doorbell(self) -> bool:
@@ -422,3 +479,44 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
             raise ValueError("This entity is not a doorbell device")
         
         return EzvizDoorbellClient(self._ezviz_client)
+        
+    def _get_device_category(self) -> str:
+        """Determine the device category based on device type or switch types.
+        
+        Returns:
+            str: Device category string (camera, doorbell, plug, etc.)
+        """
+        device_type = self._switch.get("deviceType", "").lower()
+        
+        # Check if any entities are doorbell related
+        has_doorbell_entity = any(
+            entity.get('switch_type') == DeviceSwitchType.DOORBELL_TALK.value
+            for entity in self._switch.get('entities', [])
+        )
+        
+        # Categorize by device type patterns
+        if "doorbell" in device_type or has_doorbell_entity:
+            return DeviceCategory.DOORBELL
+        elif "plug" in device_type or "socket" in device_type:
+            return DeviceCategory.PLUG
+        elif "camera" in device_type or device_type.startswith("cs-c"):
+            return DeviceCategory.CAMERA
+        elif "gateway" in device_type or device_type.startswith("cs-a1"):
+            return DeviceCategory.GATEWAY
+        elif "security" in device_type or "alarm" in device_type:
+            return DeviceCategory.SECURITY
+        
+        # If no pattern match, try to determine by available switch types
+        switch_types = [entity.get('switch_type') for entity in self._switch.get('entities', [])]
+        if DeviceSwitchType.PLUG.value in switch_types:
+            return DeviceCategory.PLUG
+        elif DeviceSwitchType.DOORBELL_TALK.value in switch_types:
+            return DeviceCategory.DOORBELL
+        elif DeviceSwitchType.ALARM_TONE.value in switch_types or DeviceSwitchType.ALARM_LIGHT.value in switch_types:
+            return DeviceCategory.SECURITY
+        
+        # Default to camera if it has light entities
+        if DeviceSwitchType.LIGHT.value in switch_types or DeviceSwitchType.INFRARED_LIGHT.value in switch_types:
+            return DeviceCategory.CAMERA
+            
+        return DeviceCategory.UNKNOWN
