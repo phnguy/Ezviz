@@ -34,7 +34,7 @@ class EzvizHttpClient:
 
     def login(self) -> Dict[str, Any]:
         """Login to the Ezviz API and return auth tokens."""
-        url = f"https://{self.api_url}/v3/users/login"
+        url = f"https://{self.api_url}/v3/users/login/v5"
         data = {
             "account": self.email,
             "password": self.password,
