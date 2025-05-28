@@ -4,6 +4,7 @@ import logging
 
 from async_timeout import timeout
 from .http_client import EzvizHttpClient
+from .doorbell_client import EzvizDoorbellClient
 import requests
 
 from homeassistant.core import HomeAssistant
@@ -21,6 +22,7 @@ class EzvizDataUpdateCoordinator(DataUpdateCoordinator):
         """Initialize global Ezviz data updater."""
         self.ezviz_client = api
         self._api_timeout = api_timeout
+        self.doorbell_client = EzvizDoorbellClient(api)
         update_interval = timedelta(seconds=30)
 
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval)
