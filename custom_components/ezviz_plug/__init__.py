@@ -2,6 +2,7 @@
 
 from homeassistant import config_entries, core
 from .const import DOMAIN
+from .doorbell_client import EzvizDoorbellClient
 
 
 async def async_setup_entry(hass: core.HomeAssistant, entry: config_entries.ConfigEntry) -> bool:

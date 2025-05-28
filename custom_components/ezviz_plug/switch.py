@@ -23,6 +23,7 @@ from homeassistant import core
 from .http_client import EzvizHttpClient
 from .const import DOMAIN
 from .coordinator import EzvizDataUpdateCoordinator
+from .doorbell_client import EzvizDoorbellClient
 
 # Define switch types that match those in pyezviz.constants.DeviceSwitchType
 class DeviceSwitchType:
@@ -402,3 +403,22 @@ class Ezvizswitch(SwitchEntity, RestoreEntity):
         # Default for any other switchable device
         else:
             return "mdi:toggle-switch"
+
+    @property
+    def is_doorbell(self) -> bool:
+        """Return True if this entity is a doorbell device."""
+        return self._switch_type == DeviceSwitchType.DOORBELL_TALK.value
+
+    def get_doorbell_client(self) -> EzvizDoorbellClient:
+        """Get doorbell client for doorbell-specific operations.
+        
+        Returns:
+            EzvizDoorbellClient instance for this device
+            
+        Raises:
+            ValueError: If this is not a doorbell device
+        """
+        if not self.is_doorbell:
+            raise ValueError("This entity is not a doorbell device")
+        
+        return EzvizDoorbellClient(self._ezviz_client)
