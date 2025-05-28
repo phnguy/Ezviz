@@ -1,16 +1,10 @@
 from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, CONF_URL, CONF_TIMEOUT, CONF_CUSTOMIZE
 from .const import DOMAIN, DEFAULT_TIMEOUT, EU_URL, RUSSIA_URL, CONF_RFSESSION_ID, CONF_SESSION_ID
-from pyezviz.client import EzvizClient
-from pyezviz.exceptions import (
-    AuthTestResultFailed,
-    EzvizAuthVerificationCode,
-    InvalidHost,
-    InvalidURL,
-    PyEzvizError,
-)
+from .http_client import EzvizHttpClient
 import logging
 import voluptuous as vol
+import requests
 from typing import Any, Dict
 
 _LOGGER = logging.getLogger(__name__)
@@ -35,7 +29,7 @@ def _validate_and_create_auth(data: dict) -> dict[str, Any]:
     """Try to login to ezviz cloud account and return token."""
     # Verify cloud credentials by attempting a login request with username and password.
     # Return login token.
-    ezviz_client = EzvizClient(
+    ezviz_client = EzvizHttpClient(
         data[CONF_EMAIL],
         data[CONF_PASSWORD],
         data[CONF_URL],
@@ -68,17 +62,18 @@ class EzvizConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 auth_data = await self.hass.async_add_executor_job(
                     _validate_and_create_auth, user_input
                 )
-            except InvalidURL:
+            except requests.exceptions.InvalidURL:
                 errors["base"] = "invalid_host"
-            except InvalidHost:
+            except requests.exceptions.ConnectionError:
                 errors["base"] = "cannot_connect"
-            except EzvizAuthVerificationCode:
-                errors["base"] = "mfa_required"
-            except PyEzvizError:
-                errors["base"] = "invalid_auth"
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected exception")
-                return self.async_abort(reason="unknown")
+            except Exception as e:  # pylint: disable=broad-except
+                if "verification code" in str(e).lower():
+                    errors["base"] = "mfa_required"
+                elif "auth" in str(e).lower() or "password" in str(e).lower():
+                    errors["base"] = "invalid_auth"
+                else:
+                    _LOGGER.exception("Unexpected exception")
+                    return self.async_abort(reason="unknown")
             else:
                 return self.async_create_entry(
                     title=user_input[CONF_EMAIL],

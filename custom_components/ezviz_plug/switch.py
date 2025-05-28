@@ -5,6 +5,7 @@ import logging
 from typing import Any, Dict
 from datetime import datetime, timedelta
 import voluptuous as vol
+import requests
 
 try:
     from homeassistant.components.switch import SwitchEntity
@@ -19,19 +20,20 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant import core
 
-from pyezviz import client
-from pyezviz.exceptions import (
-    AuthTestResultFailed,
-    EzvizAuthVerificationCode,
-    InvalidHost,
-    InvalidURL,
-    HTTPError,
-    PyEzvizError,
-)
-
-from pyezviz.constants import (DeviceSwitchType)
+from .http_client import EzvizHttpClient
 from .const import DOMAIN
 from .coordinator import EzvizDataUpdateCoordinator
+
+# Define switch types that match those in pyezviz.constants.DeviceSwitchType
+class DeviceSwitchType:
+    """Device switch types."""
+    ALARM_TONE = 1
+    LIGHT = 3
+    INFRARED_LIGHT = 10
+    PLUG = 14
+    OUTDOOR_RINGING_SOUND = 39
+    DOORBELL_TALK = 101
+    ALARM_LIGHT = 303
 
 SCAN_INTERVAL = timedelta(seconds=5)
 _LOGGER = logging.getLogger(__name__)
@@ -62,16 +64,17 @@ async def async_setup_platform(hass, config, add_entities, discovery_info=None):
 
     email = config.get(CONF_EMAIL)
     password = config.get(CONF_PASSWORD)
-    ezvizClient = client.EzvizClient(email, password)
+    ezvizClient = EzvizHttpClient(email, password)
 
     try:
         auth_data = await hass.async_add_executor_job(ezvizClient.login)
-    except (InvalidHost, InvalidURL, HTTPError, PyEzvizError) as error:
-        _LOGGER.exception('Invalid response from API: %s', error)
-    except EzvizAuthVerificationCode:
-        _LOGGER.exception('MFA Required')
-    except (Exception) as error:
-        _LOGGER.exception('Unexpected exception: %s', error)
+    except requests.exceptions.ConnectionError:
+        _LOGGER.exception('Cannot connect to API')
+    except Exception as error:
+        if "verification code" in str(error).lower():
+            _LOGGER.exception('MFA Required')
+        else:
+            _LOGGER.exception('Unexpected exception: %s', error)
 
     coordinator = EzvizDataUpdateCoordinator(hass, api=ezvizClient, api_timeout=10)
 
@@ -110,16 +113,17 @@ async def async_setup_entry(hass: core.HomeAssistant, entry: ConfigEntry,
 
     email = hass.data[DOMAIN][entry.entry_id][CONF_EMAIL]
     password = hass.data[DOMAIN][entry.entry_id][CONF_PASSWORD]
-    ezvizClient = client.EzvizClient(email, password)
+    ezvizClient = EzvizHttpClient(email, password)
 
     try:
         auth_data = await hass.async_add_executor_job(ezvizClient.login)
-    except (InvalidHost, InvalidURL, HTTPError, PyEzvizError) as error:
-        _LOGGER.exception('Invalid response from API: %s', error)
-    except EzvizAuthVerificationCode:
-        _LOGGER.exception('MFA Required')
-    except (Exception) as error:
-        _LOGGER.exception('Unexpected exception: %s', error)
+    except requests.exceptions.ConnectionError:
+        _LOGGER.exception('Cannot connect to API')
+    except Exception as error:
+        if "verification code" in str(error).lower():
+            _LOGGER.exception('MFA Required')
+        else:
+            _LOGGER.exception('Unexpected exception: %s', error)
 
     coordinator = EzvizDataUpdateCoordinator(hass, api=ezvizClient, api_timeout=10)
 
