@@ -236,3 +236,35 @@ class EzvizDoorbellClient:
         except Exception as e:
             self._logger.error("Error getting doorbell config: %s", e)
             raise
+            
+    def open_gate(self, device_serial: str) -> bool:
+        """Open the gate associated with a doorbell device.
+        
+        Args:
+            device_serial: The serial number of the doorbell device
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.http_client.session_id or not self.http_client.rf_session_id:
+            self._logger.error("Authentication required. Call login() first.")
+            return False
+
+        url = f"https://{self.http_client.api_url}/v3/devices/{device_serial}/doorbell/openDoor"
+        
+        try:
+            response = self.http_client.session.post(url, timeout=self.http_client.timeout)
+            response.raise_for_status()
+            response_data = response.json()
+
+            if response_data.get("meta", {}).get("code") != 200:
+                error_msg = response_data.get("meta", {}).get("message", "Unknown error")
+                self._logger.error("Error opening gate: %s", error_msg)
+                return False
+
+            self._logger.info("Gate opened successfully for device %s", device_serial)
+            return True
+
+        except Exception as e:
+            self._logger.error("Error opening gate: %s", e)
+            return False
